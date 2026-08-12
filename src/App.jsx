@@ -20,6 +20,7 @@ import {
   CheckCircle2,
   ChevronDown,
   ChevronUp,
+  FilterX,
 } from 'lucide-react';
 
 // 🔗 LINKS DIRETO DAS PLANILHAS NO SEU ONEDRIVE (PEPSICO)
@@ -324,31 +325,43 @@ export default function App() {
     let abaAlvo = null;
     let registrosBrutos = [];
 
+    // BUSCA INTELIGENTE: Prioriza abas que contêm "Base" no nome, ou pega a 3ª/4ª aba onde geralmente ficam os dados consolidados
     for (const nomeAba of livro.SheetNames) {
-      const folha = livro.Sheets[nomeAba];
-      const jsonTemp = XLSX.utils.sheet_to_json(folha, { defval: '' });
-      if (jsonTemp.length > 0) {
-        const chaves = Object.keys(jsonTemp[0]).map((k) => k.toUpperCase());
-        const possuiColunasSinistro = chaves.some(
-          (k) =>
-            k.includes('PLACA') ||
-            k.includes('SINISTRO') ||
-            k.includes('SINISITRO')
-        );
-        if (possuiColunasSinistro || nomeAba.toLowerCase().includes('base')) {
-          abaAlvo = nomeAba;
-          registrosBrutos = jsonTemp;
-          break;
+      if (nomeAba.toLowerCase().includes('base')) {
+        abaAlvo = nomeAba;
+        break;
+      }
+    }
+
+    // Se não achar pelo nome "Base", procura uma aba que tenha colunas de placa/sinistro
+    if (!abaAlvo) {
+      for (const nomeAba of livro.SheetNames) {
+        const folha = livro.Sheets[nomeAba];
+        const jsonTemp = XLSX.utils.sheet_to_json(folha, { defval: '' });
+        if (jsonTemp.length > 0) {
+          const chaves = Object.keys(jsonTemp[0]).map((k) => k.toUpperCase());
+          const possuiColunasSinistro = chaves.some(
+            (k) =>
+              k.includes('PLACA') ||
+              k.includes('SINISTRO') ||
+              k.includes('GPID')
+          );
+          if (possuiColunasSinistro) {
+            abaAlvo = nomeAba;
+            break;
+          }
         }
       }
     }
 
-    if (!abaAlvo && livro.SheetNames.length > 0) {
-      abaAlvo = livro.SheetNames[0];
-      registrosBrutos = XLSX.utils.sheet_to_json(livro.Sheets[abaAlvo], {
-        defval: '',
-      });
+    // Se ainda não achou, recorre à 3ª aba (índice 2) ou à 1ª aba como fallback seguro
+    if (!abaAlvo) {
+      abaAlvo = livro.SheetNames[2] || livro.SheetNames[0];
     }
+
+    registrosBrutos = XLSX.utils.sheet_to_json(livro.Sheets[abaAlvo], {
+      defval: '',
+    });
 
     const listaSinistros = [];
     registrosBrutos.forEach((linha, index) => {
@@ -1524,7 +1537,7 @@ export default function App() {
                 </h3>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {colunasPrincipaisForms.map((item, idxCard) => {
+                  {colunasPrincipaisForms.map((item) => {
                     const dadosGrafico = calcularGraficoColuna(item.coluna);
 
                     return (
